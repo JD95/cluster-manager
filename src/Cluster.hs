@@ -2,7 +2,7 @@
 
 module Cluster (app) where
 
-import Control.Monad ((<=<))
+import Control.Monad (void, (<=<))
 import qualified Data.ByteString as BS
 import Data.Foldable (for_)
 import Data.Maybe (catMaybes)
@@ -19,6 +19,7 @@ import qualified Prettyprinter.Render.Text as Pretty
 import qualified System.Directory as Directory
 import System.IO (hClose)
 import qualified System.IO.Temp as Temp
+import qualified System.Process as Process
 
 newtype Folder = Folder {unFolder :: FilePath}
   deriving (Show)
@@ -56,12 +57,16 @@ dhallFile file
   | otherwise = Nothing
 
 kubectlDelete :: File Yaml -> IO ()
-kubectlDelete (File config) =
-  putStrLn $ "deleting kube object from " <> config
+kubectlDelete (File config) = do
+  let process = (Process.proc "kubectl" ["delete", "-f", config]) {Process.std_out = Process.Inherit}
+  (_, _, _, p) <- Process.createProcess_ "kubectlDelete" process
+  void $ Process.waitForProcess p
 
 kubectlApply :: File Yaml -> IO ()
-kubectlApply (File config) =
-  putStrLn $ "applying configuration from " <> config
+kubectlApply (File config) = do
+  let process = (Process.proc "kubectl" ["apply", "-f", config]) {Process.std_out = Process.Inherit}
+  (_, _, _, p) <- Process.createProcess_ "kubectlApply" process
+  void $ Process.waitForProcess p
 
 updateKubeObject :: File Yaml -> IO ()
 updateKubeObject config = do
