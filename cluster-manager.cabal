@@ -67,10 +67,17 @@ library
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.19.1.0
+    build-depends:    base ^>=4.18.2.0
+                    , bytestring <0.12
                     , directory ^>=1.3.8.3
+                    , dhall ^>=1.42.1
+                    , dhall-yaml ^>=1.2.12
+                    , dhall-json ^>=1.7.12
+                    , lens-family-core ^>=2.1.3
+                    , prettyprinter ^>=1.7.1
                     , process ^>=1.6.18.0
-                    , text ^>=2.1.1
+                    , text ^>=2.0
+                    , temporary ^>=1.3
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -93,7 +100,7 @@ executable cluster-manager
 
     -- Other library packages from which modules are imported.
     build-depends:
-        base ^>=4.19.1.0,
+        base ^>=4.18.2.0,
         cluster-manager
 
     -- Directories containing source files.
@@ -126,5 +133,5 @@ test-suite cluster-manager-test
 
     -- Test dependencies.
     build-depends:
-        base ^>=4.19.1.0,
+        base ^>=4.18.2.0,
         cluster-manager
