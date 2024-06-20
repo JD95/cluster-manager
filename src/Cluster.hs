@@ -4,7 +4,9 @@ module Cluster (app) where
 
 import Control.Monad (void, (<=<))
 import qualified Data.ByteString as BS
+import Data.Coerce
 import Data.Foldable (for_)
+import Data.List (isSuffixOf)
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -22,10 +24,10 @@ import qualified System.IO.Temp as Temp
 import qualified System.Process as Process
 
 newtype Folder = Folder {unFolder :: FilePath}
-  deriving (Show)
+  deriving (Show, Eq)
 
 newtype File a = File {unFile :: FilePath}
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Dhall
 
@@ -58,7 +60,10 @@ dhallFile file
 
 kubectlDelete :: File Yaml -> IO ()
 kubectlDelete (File config) = do
-  let process = (Process.proc "kubectl" ["delete", "-f", config]) {Process.std_out = Process.Inherit}
+  let process =
+        (Process.proc "kubectl" ["delete", "--ignore-not-found", "-f", config])
+          { Process.std_out = Process.Inherit
+          }
   (_, _, _, p) <- Process.createProcess_ "kubectlDelete" process
   void $ Process.waitForProcess p
 
@@ -96,15 +101,31 @@ withCompiledDhallConfig go service (File file) = do
     hClose handle
     go $ File path
 
+popFirst :: (a -> Bool) -> [a] -> ([a], Maybe a)
+popFirst _ [] = ([], Nothing)
+popFirst cond (x : xs) =
+  if cond x
+    then (xs, Just x)
+    else
+      let (rest, result) = popFirst cond xs
+       in (x : rest, result)
+
 app :: IO ()
 app = do
   thisDir <- Folder <$> Directory.getCurrentDirectory
-  services <- dirFolders thisDir
+  (services, operatorDir) <- popFirst (("operators" `isSuffixOf`) . unFolder) <$> dirFolders thisDir
+
+  for_ operatorDir $ \dir -> do
+    putStrLn "Applying Operators"
+    operators <- dirFiles dir
+    traverse kubectlApply (coerce operators :: [File Yaml])
+
   putStrLn "Detected Services:"
   for_ services $
     putStrLn . ("- " <>)
       <=< Directory.makeRelativeToCurrentDirectory
         . unFolder
+
   for_ services $ \service -> do
     files <- dirFiles service
     traverse (withCompiledDhallConfig updateKubeObject service)
